@@ -1,35 +1,141 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+import { useState } from "react";
+
+const API_BASE = "http://127.0.0.1:8000/api";
 
 function App() {
-  const [count, setCount] = useState(0)
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [category, setCategory] = useState("general");
+  const [priority, setPriority] = useState("low");
+
+  const [loadingLLM, setLoadingLLM] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+
+  const handleClassify = async () => {
+    if (!description) return;
+
+    setLoadingLLM(true);
+
+    try {
+      const res = await fetch(`${API_BASE}/tickets/classify/`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ description }),
+      });
+
+      const data = await res.json();
+
+      if (data.suggested_category)
+        setCategory(data.suggested_category);
+      if (data.suggested_priority)
+        setPriority(data.suggested_priority);
+
+    } catch (err) {
+      console.error("LLM error", err);
+    }
+
+    setLoadingLLM(false);
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    setSubmitting(true);
+
+    try {
+      await fetch(`${API_BASE}/tickets/`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          title,
+          description,
+          category,
+          priority,
+        }),
+      });
+
+      // clear form
+      setTitle("");
+      setDescription("");
+      setCategory("general");
+      setPriority("low");
+
+      alert("Ticket submitted successfully!");
+
+    } catch (err) {
+      console.error("Submit error", err);
+    }
+
+    setSubmitting(false);
+  };
 
   return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
+    <div style={{ padding: "40px", maxWidth: "600px", margin: "auto" }}>
+      <h2>Submit Support Ticket</h2>
+
+      <form onSubmit={handleSubmit}>
+        <div>
+          <label>Title</label>
+          <input
+            type="text"
+            maxLength="200"
+            required
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            style={{ width: "100%", marginBottom: "10px" }}
+          />
+        </div>
+
+        <div>
+          <label>Description</label>
+          <textarea
+            required
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            onBlur={handleClassify}
+            style={{ width: "100%", height: "100px", marginBottom: "10px" }}
+          />
+          {loadingLLM && <p>Analyzing description...</p>}
+        </div>
+
+        <div>
+          <label>Category</label>
+          <select
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+            style={{ width: "100%", marginBottom: "10px" }}
+          >
+            <option value="billing">Billing</option>
+            <option value="technical">Technical</option>
+            <option value="account">Account</option>
+            <option value="general">General</option>
+          </select>
+        </div>
+
+        <div>
+          <label>Priority</label>
+          <select
+            value={priority}
+            onChange={(e) => setPriority(e.target.value)}
+            style={{ width: "100%", marginBottom: "20px" }}
+          >
+            <option value="low">Low</option>
+            <option value="medium">Medium</option>
+            <option value="high">High</option>
+            <option value="critical">Critical</option>
+          </select>
+        </div>
+
+        <button type="submit" disabled={submitting}>
+          {submitting ? "Submitting..." : "Submit Ticket"}
         </button>
-        <p>
-          Edit <code>src/App.jsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
-  )
+      </form>
+    </div>
+  );
 }
 
-export default App
+export default App;
