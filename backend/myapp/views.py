@@ -78,8 +78,12 @@ class TicketStatsView(APIView):
 
 
 #LLM INTEGRATION 
-import google.generativeai as genai
+from google import genai
 from django.conf import settings
+from rest_framework.views import APIView
+from rest_framework.response import Response
+import json
+import re
 
 
 class TicketClassifyView(APIView):
@@ -90,8 +94,7 @@ class TicketClassifyView(APIView):
             return Response({"error": "Description is required"}, status=400)
 
         try:
-            genai.configure(api_key=settings.GEMINI_API_KEY)
-            model = genai.GenerativeModel("gemini-1.5-flash")
+            client = genai.Client(api_key=settings.GEMINI_API_KEY)
 
             prompt = f"""
 You are a support ticket classifier.
@@ -100,32 +103,49 @@ Classify the ticket into:
 Category: billing, technical, account, or general
 Priority: low, medium, high, or critical
 
-Return ONLY valid JSON like:
+Return ONLY valid JSON:
 {{"category": "...", "priority": "..."}}
 
 Ticket description:
 {description}
 """
 
-            response = model.generate_content(prompt)
-            text = response.text.strip()
-
-            import json
-            data = json.loads(text)
-
-            return Response(
-                {
-                    "suggested_category": data.get("category", "general"),
-                    "suggested_priority": data.get("priority", "low"),
-                }
+            response = client.models.generate_content(
+                model="gemini-2.0-flash",
+                contents=prompt,
             )
 
-        except Exception:
-            # graceful failure required in assignment
-            return Response(
-                {
-                    "suggested_category": "general",
-                    "suggested_priority": "low",
-                    "warning": "LLM unavailable, using defaults",
-                }
-            )
+            text = response.text
+            match = re.search(r"\{.*\}", text, re.DOTALL)
+            data = json.loads(match.group()) if match else {}
+
+            return Response({
+                "suggested_category": data.get("category", "general"),
+                "suggested_priority": data.get("priority", "low"),
+            })
+
+        except Exception as e:
+            print("Gemini Error:", str(e))
+
+            description_lower = description.lower()
+
+            # simple intelligent fallback
+            if "payment" in description_lower or "charge" in description_lower:
+                category = "billing"
+                priority = "medium"
+            elif "error" in description_lower or "bug" in description_lower:
+                category = "technical"
+                priority = "high"
+            elif "login" in description_lower or "account" in description_lower:
+                category = "account"
+                priority = "medium"
+            else:
+                category = "general"
+                priority = "low"
+
+            return Response({
+                "suggested_category": category,
+                "suggested_priority": priority,
+                "warning": "LLM quota exceeded, using intelligent fallback"
+            })
+
