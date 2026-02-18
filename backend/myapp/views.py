@@ -74,3 +74,58 @@ class TicketStatsView(APIView):
                 "category_breakdown": category_breakdown,
             }
         )
+
+
+
+#LLM INTEGRATION 
+import google.generativeai as genai
+from django.conf import settings
+
+
+class TicketClassifyView(APIView):
+    def post(self, request):
+        description = request.data.get("description")
+
+        if not description:
+            return Response({"error": "Description is required"}, status=400)
+
+        try:
+            genai.configure(api_key=settings.GEMINI_API_KEY)
+            model = genai.GenerativeModel("gemini-1.5-flash")
+
+            prompt = f"""
+You are a support ticket classifier.
+
+Classify the ticket into:
+Category: billing, technical, account, or general
+Priority: low, medium, high, or critical
+
+Return ONLY valid JSON like:
+{{"category": "...", "priority": "..."}}
+
+Ticket description:
+{description}
+"""
+
+            response = model.generate_content(prompt)
+            text = response.text.strip()
+
+            import json
+            data = json.loads(text)
+
+            return Response(
+                {
+                    "suggested_category": data.get("category", "general"),
+                    "suggested_priority": data.get("priority", "low"),
+                }
+            )
+
+        except Exception:
+            # graceful failure required in assignment
+            return Response(
+                {
+                    "suggested_category": "general",
+                    "suggested_priority": "low",
+                    "warning": "LLM unavailable, using defaults",
+                }
+            )
