@@ -41,6 +41,7 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 INSTALLED_APPS = [
     'myapp',
     'rest_framework',
+    "corsheaders",
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -51,6 +52,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    "corsheaders.middleware.CorsMiddleware",
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -60,6 +62,7 @@ MIDDLEWARE = [
 ]
 
 ROOT_URLCONF = 'task.urls'
+CORS_ALLOW_ALL_ORIGINS = True
 
 TEMPLATES = [
     {
